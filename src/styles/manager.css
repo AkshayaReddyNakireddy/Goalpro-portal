@@ -1,0 +1,536 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:'Inter',sans-serif;
+}
+
+body{
+  background:#eef5fb;
+}
+
+/* MAIN */
+.manager-container{
+  display:flex;
+  min-height:100vh;
+  background:#eef5fb;
+}
+
+/* SIDEBAR */
+.sidebar{
+  width:250px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #062b66 0%,
+      #05307a 100%
+    );
+
+  color:white;
+
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+
+  padding:30px 20px;
+
+  position:fixed;
+  top:0;
+  left:0;
+  bottom:0;
+
+  box-shadow:
+    8px 0 30px rgba(0,0,0,0.08);
+}
+
+/* LOGO */
+.logo-section{
+  margin-bottom:50px;
+}
+
+.logo-title{
+  font-size:32px;
+  font-weight:800;
+  letter-spacing:-1px;
+}
+
+.logo-subtitle{
+  margin-top:5px;
+  color:#cfe2ff;
+  font-size:14px;
+}
+
+/* MENU */
+.menu{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.menu-item{
+  padding:14px 18px;
+
+  border-radius:14px;
+
+  cursor:pointer;
+
+  transition:0.3s;
+
+  font-weight:500;
+
+  color:#e0edff;
+}
+
+.menu-item:hover{
+  background:
+    rgba(255,255,255,0.12);
+}
+
+.active{
+  background:
+    rgba(59,130,246,0.35);
+
+  color:white;
+}
+
+/* LOGOUT */
+.logout-btn{
+  border:none;
+
+  background:#ef4444;
+
+  color:white;
+
+  padding:14px;
+
+  border-radius:14px;
+
+  cursor:pointer;
+
+  font-weight:600;
+
+  transition:0.3s;
+}
+
+.logout-btn:hover{
+  background:#dc2626;
+}
+
+/* MAIN CONTENT */
+.main-content{
+  flex:1;
+
+  margin-left:250px;
+
+  padding:35px;
+}
+
+/* TOP BANNER */
+.top-banner{
+  background:
+    linear-gradient(
+      135deg,
+      #dff1ff,
+      #cfe9ff
+    );
+
+  border-radius:30px;
+
+  padding:35px;
+
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+
+  margin-bottom:30px;
+}
+
+/* TITLE */
+.banner-title{
+  font-size:38px;
+  font-weight:800;
+  color:#0f172a;
+}
+
+.banner-subtitle{
+  margin-top:8px;
+  color:#475569;
+}
+
+/* PROFILE */
+.profile-card{
+  background:white;
+
+  border-radius:20px;
+
+  padding:15px 20px;
+
+  display:flex;
+  align-items:center;
+
+  gap:14px;
+
+  box-shadow:
+    0 6px 20px rgba(0,0,0,0.05);
+}
+
+.profile-circle{
+  width:50px;
+  height:50px;
+
+  border-radius:50%;
+
+  background:#2563eb;
+
+  color:white;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  font-weight:700;
+  font-size:18px;
+}
+
+.profile-role{
+  font-size:13px;
+  color:#64748b;
+}
+
+.profile-name{
+  font-size:18px;
+  color:#0f172a;
+}
+
+/* STATS */
+.stats-grid{
+  display:grid;
+
+  grid-template-columns:
+    repeat(auto-fit,minmax(250px,1fr));
+
+  gap:22px;
+
+  margin-bottom:30px;
+}
+
+.stats-card{
+  background:white;
+
+  border-radius:25px;
+
+  padding:28px;
+
+  border:
+    1px solid #e2e8f0;
+
+  box-shadow:
+    0 6px 20px rgba(0,0,0,0.04);
+
+  transition:0.3s;
+}
+
+.stats-card:hover{
+  transform:translateY(-4px);
+}
+
+.stats-label{
+  color:#64748b;
+  font-size:15px;
+}
+
+.stats-value{
+  margin-top:12px;
+
+  font-size:40px;
+
+  font-weight:800;
+
+  color:#0f172a;
+}
+
+.green{
+  color:#16a34a;
+}
+
+.yellow{
+  color:#f59e0b;
+}
+
+/* GOAL GRID */
+.goal-grid{
+  display:grid;
+
+  grid-template-columns:
+    repeat(auto-fit,minmax(420px,1fr));
+
+  gap:22px;
+}
+
+/* GOAL CARD */
+.goal-card{
+  background:white;
+
+  border-radius:28px;
+
+  padding:28px;
+
+  border:
+    1px solid #e2e8f0;
+
+  box-shadow:
+    0 6px 20px rgba(0,0,0,0.04);
+}
+
+/* TOP */
+.goal-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+
+  margin-bottom:20px;
+}
+
+.goal-title{
+  font-size:28px;
+  font-weight:800;
+  color:#0f172a;
+}
+
+.goal-email{
+  margin-top:5px;
+  font-size:14px;
+  color:#64748b;
+}
+
+/* SHARED */
+.shared-badge{
+  background:#f3e8ff;
+
+  color:#7e22ce;
+
+  padding:8px 14px;
+
+  border-radius:999px;
+
+  font-size:13px;
+
+  font-weight:700;
+}
+
+/* DETAILS */
+.goal-details{
+  margin-bottom:24px;
+}
+
+.goal-details p{
+  margin-bottom:10px;
+  color:#334155;
+  font-size:15px;
+}
+
+/* SECTION */
+.section-box{
+  background:#f8fafc;
+
+  border-radius:22px;
+
+  padding:22px;
+
+  margin-bottom:22px;
+}
+
+.section-title{
+  font-size:18px;
+
+  font-weight:700;
+
+  color:#0f172a;
+
+  margin-bottom:18px;
+}
+
+/* INPUT */
+.input-field{
+  width:100%;
+
+  border:
+    1px solid #dbeafe;
+
+  border-radius:14px;
+
+  padding:14px 16px;
+
+  margin-bottom:14px;
+
+  outline:none;
+
+  font-size:15px;
+
+  transition:0.3s;
+}
+
+.input-field:focus{
+  border-color:#2563eb;
+
+  box-shadow:
+    0 0 0 4px rgba(37,99,235,0.12);
+}
+
+/* TEXTAREA */
+.textarea-field{
+  width:100%;
+
+  min-height:120px;
+
+  resize:none;
+
+  border:
+    1px solid #dbeafe;
+
+  border-radius:14px;
+
+  padding:14px 16px;
+
+  outline:none;
+
+  font-size:15px;
+
+  transition:0.3s;
+}
+
+.textarea-field:focus{
+  border-color:#2563eb;
+
+  box-shadow:
+    0 0 0 4px rgba(37,99,235,0.12);
+}
+
+/* SAVE */
+.save-btn{
+  width:100%;
+
+  border:none;
+
+  background:#2563eb;
+
+  color:white;
+
+  padding:14px;
+
+  border-radius:14px;
+
+  cursor:pointer;
+
+  font-weight:700;
+
+  transition:0.3s;
+}
+
+.save-btn:hover{
+  background:#1d4ed8;
+}
+
+/* ACTIONS */
+.action-buttons{
+  display:flex;
+  gap:14px;
+}
+
+/* APPROVE */
+.approve-btn{
+  flex:1;
+
+  border:none;
+
+  background:#16a34a;
+
+  color:white;
+
+  padding:14px;
+
+  border-radius:14px;
+
+  cursor:pointer;
+
+  font-weight:700;
+
+  transition:0.3s;
+}
+
+.approve-btn:hover{
+  background:#15803d;
+}
+
+/* REWORK */
+.rework-btn{
+  flex:1;
+
+  border:none;
+
+  background:#ef4444;
+
+  color:white;
+
+  padding:14px;
+
+  border-radius:14px;
+
+  cursor:pointer;
+
+  font-weight:700;
+
+  transition:0.3s;
+}
+
+.rework-btn:hover{
+  background:#dc2626;
+}
+
+/* RESPONSIVE */
+@media(max-width:1024px){
+
+  .goal-grid{
+    grid-template-columns:1fr;
+  }
+}
+
+@media(max-width:768px){
+
+  .sidebar{
+    display:none;
+  }
+
+  .main-content{
+    margin-left:0;
+    padding:20px;
+  }
+
+  .top-banner{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:20px;
+  }
+
+  .banner-title{
+    font-size:28px;
+  }
+}
+
+@media(max-width:480px){
+
+  .goal-card{
+    padding:22px;
+  }
+
+  .stats-value{
+    font-size:32px;
+  }
+
+  .banner-title{
+    font-size:24px;
+  }
+}
