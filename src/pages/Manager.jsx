@@ -22,7 +22,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import "../styles/Manager.css";
+import "../styles/manager.css";
 
 function Manager() {
 
