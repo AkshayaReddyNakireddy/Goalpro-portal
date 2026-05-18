@@ -245,26 +245,27 @@ function SharedKPI() {
   };
 
   // FIXED BACK NAVIGATION
-  const goBackDashboard =
-  () => {
+ const goBackDashboard =
+() => {
 
-    const from =
-      searchParams.get(
-        "from"
-      );
+  const from =
 
-    // ADMIN
-    if(from === "admin"){
+    localStorage.getItem(
+      "sharedKpiFrom"
+    );
 
-      navigate("/admin");
-    }
+  if(
+    from === "admin"
+  ){
 
-    // MANAGER
-    else{
+    navigate("/admin");
+  }
 
-      navigate("/manager");
-    }
-  };
+  else{
+
+    navigate("/manager");
+  }
+};
 
   return (
 

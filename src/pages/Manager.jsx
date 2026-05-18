@@ -6,6 +6,7 @@ import {
   updateDoc,
   doc,
   addDoc,
+  serverTimestamp
 } from "firebase/firestore";
 
 import {
@@ -21,7 +22,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import "../styles/manager.css";
+import "../styles/Manager.css";
 
 function Manager() {
 
@@ -155,6 +156,37 @@ function Manager() {
     );
   };
 
+  // CREATE NOTIFICATION
+  const createNotification =
+  async (
+    email,
+    type,
+    message
+  ) => {
+
+    await addDoc(
+
+      collection(
+        db,
+        "notifications"
+      ),
+
+      {
+
+        email,
+
+        type,
+
+        message,
+
+        read:false,
+
+        createdAt:
+          serverTimestamp(),
+      }
+    );
+  };
+
   // APPROVE
   const approveGoal =
   async (goal) => {
@@ -174,6 +206,16 @@ function Manager() {
 
         locked:true,
       }
+    );
+
+    // NOTIFICATION
+    await createNotification(
+
+      goal.employeeEmail,
+
+      "approval",
+
+      `Your goal "${goal.title}" was approved by manager.`
     );
 
     await createAuditLog(
@@ -207,12 +249,24 @@ function Manager() {
         status:
           "Rework Required",
 
+        locked:false,
+
         managerFeedback:
 
           feedbackInputs[
             goal.id
           ] || "",
       }
+    );
+
+    // NOTIFICATION
+    await createNotification(
+
+      goal.employeeEmail,
+
+      "rework",
+
+      `Your goal "${goal.title}" was returned for rework by manager.`
     );
 
     await createAuditLog(
@@ -249,6 +303,16 @@ function Manager() {
             goal.id
           ] || "",
       }
+    );
+
+    // NOTIFICATION
+    await createNotification(
+
+      goal.employeeEmail,
+
+      "checkin",
+
+      `Manager added quarterly check-in comments for "${goal.title}".`
     );
 
     await createAuditLog(
@@ -324,6 +388,16 @@ function Manager() {
       );
     }
 
+    // NOTIFICATION
+    await createNotification(
+
+      goal.employeeEmail,
+
+      "goal_edit",
+
+      `Manager modified your goal "${goal.title}".`
+    );
+
     alert(
       "Goal Updated"
     );
@@ -379,18 +453,24 @@ function Manager() {
 
             </div>
 
-            {/* FIXED SHARED KPI NAVIGATION */}
+            {/* SHARED KPI */}
             <div
               className="menu-item"
 
-              onClick={() =>
-  navigate(
-    "/shared-kpi?from=manager"
-  )
-}
+              onClick={() => {
+
+                localStorage.setItem(
+                  "sharedKpiFrom",
+                  "manager"
+                );
+
+                navigate(
+                  "/sharedkpi"
+                );
+              }}
             >
 
-              Shared KPI
+              Shared KPI Portal
 
             </div>
 
@@ -679,17 +759,6 @@ function Manager() {
                     :
 
                     goal.target
-                  }
-
-                </p>
-
-                <p>
-
-                  📊 Actual Achievement:
-                  {" "}
-                  {
-                    goal.achievement ||
-                    "N/A"
                   }
 
                 </p>

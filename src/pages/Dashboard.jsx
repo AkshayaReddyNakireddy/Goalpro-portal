@@ -4,8 +4,11 @@ import {
   collection,
   addDoc,
   getDocs,
-  doc,
   updateDoc,
+  doc,
+  query,
+  where,
+  orderBy,
 } from "firebase/firestore";
 
 import {
@@ -28,8 +31,13 @@ function Dashboard() {
   const navigate =
     useNavigate();
 
+  // STATES
   const [goals,
   setGoals] =
+    useState([]);
+
+  const [notifications,
+  setNotifications] =
     useState([]);
 
   const [title,
@@ -40,245 +48,208 @@ function Dashboard() {
   setDescription] =
     useState("");
 
+  const [thrustArea,
+  setThrustArea] =
+    useState("");
+
   const [target,
   setTarget] =
+    useState("");
+
+  const [uom,
+  setUom] =
     useState("");
 
   const [weightage,
   setWeightage] =
     useState("");
 
-  const [uom,
-  setUom] =
-    useState("Min Numeric");
+  const [shared,
+  setShared] =
+    useState(false);
 
-  const [thrustArea,
-  setThrustArea] =
-    useState("");
-
-  const [deadline,
-  setDeadline] =
-    useState("");
+  const [selectedCycle,
+  setSelectedCycle] =
+    useState("Q1");
 
   const [achievementInputs,
   setAchievementInputs] =
-    useState({});
-
-  const [statusInputs,
-  setStatusInputs] =
     useState({});
 
   // FETCH GOALS
   const fetchGoals =
   async () => {
 
+    const q = query(
+
+      collection(
+        db,
+        "goals"
+      ),
+
+      where(
+        "employeeEmail",
+        "==",
+        auth.currentUser.email
+      )
+    );
+
     const querySnapshot =
-      await getDocs(
-        collection(
-          db,
-          "goals"
-        )
-      );
+      await getDocs(q);
 
     const data = [];
 
     querySnapshot.forEach(
       (docItem) => {
 
-        const goal =
-          docItem.data();
+        data.push({
 
-        if (
-          goal.employeeEmail ===
-          auth.currentUser.email
-        ) {
+          id:
+            docItem.id,
 
-          data.push({
-
-            id:
-              docItem.id,
-
-            ...goal,
-
-          });
-        }
+          ...docItem.data(),
+        });
       }
     );
 
     setGoals(data);
   };
 
+  // FETCH NOTIFICATIONS
+  const fetchNotifications =
+  async () => {
+
+    const q = query(
+
+      collection(
+        db,
+        "notifications"
+      ),
+
+      where(
+        "email",
+        "==",
+        auth.currentUser.email
+      ),
+
+      orderBy(
+        "createdAt",
+        "desc"
+      )
+    );
+
+    const querySnapshot =
+      await getDocs(q);
+
+    const data = [];
+
+    querySnapshot.forEach(
+      (docItem) => {
+
+        data.push({
+
+          id:
+            docItem.id,
+
+          ...docItem.data(),
+        });
+      }
+    );
+
+    setNotifications(data);
+  };
+
   useEffect(() => {
 
     fetchGoals();
 
+    fetchNotifications();
+
   }, []);
 
-  // QUARTERLY WINDOW
-  const getCurrentPhase =
-  () => {
+  // LIVE WEIGHTAGE DISPLAY
+  const liveWeightage =
 
-    const month =
-      new Date().getMonth() + 1;
+    goals.reduce(
 
-    // MAY-JUNE
-    if (
-      month === 5 ||
-      month === 6
-    ) {
+      (sum, goal)=>
 
-      return {
+        sum +
+        Number(goal.weightage),
 
-        phase:
-          "Phase 1 — Goal Setting",
+      0
+    )
 
-        allowGoalCreation:
-          true,
+    +
 
-        allowCheckin:
-          false,
-      };
-    }
-
-    // JULY-SEPT
-    if (
-      month >= 7 &&
-      month <= 9
-    ) {
-
-      return {
-
-        phase:
-          "Q1 Check-in",
-
-        allowGoalCreation:
-          false,
-
-        allowCheckin:
-          true,
-      };
-    }
-
-    // OCT-DEC
-    if (
-      month >= 10 &&
-      month <= 12
-    ) {
-
-      return {
-
-        phase:
-          "Q2 Check-in",
-
-        allowGoalCreation:
-          false,
-
-        allowCheckin:
-          true,
-      };
-    }
-
-    // JAN-FEB
-    if (
-      month >= 1 &&
-      month <= 2
-    ) {
-
-      return {
-
-        phase:
-          "Q3 Check-in",
-
-        allowGoalCreation:
-          false,
-
-        allowCheckin:
-          true,
-      };
-    }
-
-    // MAR-APR
-    return {
-
-      phase:
-        "Q4 / Annual Review",
-
-      allowGoalCreation:
-        false,
-
-      allowCheckin:
-        true,
-    };
-  };
-
-  const currentPhase =
-    getCurrentPhase();
+    Number(weightage || 0);
 
   // CREATE GOAL
-  const addGoal =
+  const createGoal =
   async () => {
 
-    if (
+    // MAX GOALS
+    if(goals.length >= 8){
+
+      alert(
+        "Maximum 8 goals allowed per employee"
+      );
+
+      return;
+    }
+
+    // REQUIRED FIELDS
+    if(
       !title ||
+      !description ||
+      !thrustArea ||
       !target ||
+      !uom ||
       !weightage
-    ) {
+    ){
 
       alert(
-        "Fill required fields"
+        "Please fill all fields"
       );
 
       return;
     }
 
-    // MAX 8 GOALS
-    if (
-      goals.length >= 8
-    ) {
+    // MIN WEIGHTAGE
+    if(Number(weightage) < 10){
 
       alert(
-        "Maximum 8 goals allowed"
+        "Minimum weightage per goal must be 10%"
       );
 
       return;
     }
 
-    // MIN 10%
-    if (
-      Number(weightage) < 10
-    ) {
+    // EXISTING DB WEIGHTAGE
+    const existingWeightage =
 
-      alert(
-        "Minimum weightage is 10%"
-      );
-
-      return;
-    }
-
-    // TOTAL 100%
-    const totalWeightage =
       goals.reduce(
 
-        (
-          total,
-          goal
-        ) =>
+        (sum, goal)=>
 
-          total +
-          Number(
-            goal.weightage
-          ),
+          sum +
+          Number(goal.weightage),
 
         0
-      ) +
+      );
+
+    // FINAL
+    const finalWeightage =
+
+      existingWeightage +
+
       Number(weightage);
 
-    if (
-      totalWeightage > 100
-    ) {
+    // MAX VALIDATION
+    if(finalWeightage > 100){
 
       alert(
-        "Total weightage cannot exceed 100%"
+        `Total weightage exceeded. Current total: ${finalWeightage}%`
       );
 
       return;
@@ -293,54 +264,52 @@ function Dashboard() {
 
       {
 
-        employeeEmail:
-          auth.currentUser.email,
-
         title,
 
         description,
 
-        target,
+        thrustArea,
 
-        weightage,
+        target,
 
         uom,
 
-        thrustArea,
+        weightage,
 
-        deadline,
+        shared,
 
-        achievement:
-          "",
-
-        progressStatus:
-          "Not Started",
+        employeeEmail:
+          auth.currentUser.email,
 
         status:
           "Pending Approval",
 
-        locked:
-          false,
+        progressStatus:
+          "Not Started",
 
-        shared:
-          false,
+        achievements:{},
 
-        managerFeedback:
-          "",
+        managerFeedback:"",
 
+        locked:false,
+
+        createdAt:
+          new Date()
+            .toISOString(),
       }
     );
 
     alert(
-      "Goal Created"
+      "Goal Created Successfully"
     );
 
     setTitle("");
     setDescription("");
-    setTarget("");
-    setWeightage("");
     setThrustArea("");
-    setDeadline("");
+    setTarget("");
+    setUom("");
+    setWeightage("");
+    setShared(false);
 
     fetchGoals();
   };
@@ -348,6 +317,74 @@ function Dashboard() {
   // UPDATE ACHIEVEMENT
   const updateAchievement =
   async (goal) => {
+
+    const achievement =
+
+      achievementInputs[
+        goal.id
+      ];
+
+    if(!achievement){
+
+      alert(
+        "Please enter achievement"
+      );
+
+      return;
+    }
+
+    const updatedAchievements = {
+
+      ...goal.achievements,
+
+      [selectedCycle.toLowerCase()]:
+        achievement,
+    };
+
+    const progress =
+
+      Math.min(
+
+        Math.round(
+
+          (
+            Number(achievement)
+
+            /
+
+            Number(goal.target)
+          ) * 100
+        ),
+
+        150
+      );
+
+    let progressStatus =
+      "Not Started";
+
+    if(progress >= 100){
+
+      progressStatus =
+        "Completed";
+    }
+
+    else if(progress >= 75){
+
+      progressStatus =
+        "On Track";
+    }
+
+    else if(progress >= 40){
+
+      progressStatus =
+        "Needs Attention";
+    }
+
+    else{
+
+      progressStatus =
+        "Critical";
+    }
 
     await updateDoc(
 
@@ -359,18 +396,10 @@ function Dashboard() {
 
       {
 
-        achievement:
+        achievements:
+          updatedAchievements,
 
-          achievementInputs[
-            goal.id
-          ] || "",
-
-        progressStatus:
-
-          statusInputs[
-            goal.id
-          ] || "Not Started",
-
+        progressStatus,
       }
     );
 
@@ -381,99 +410,38 @@ function Dashboard() {
     fetchGoals();
   };
 
-  // PROGRESS SCORE
-  const calculateProgress =
-  (goal) => {
+  // KPI %
+  const calculateProgress = (
+    target,
+    achievement
+  ) => {
 
-    const target =
-      Number(goal.target);
+    const planned =
+      Number(target);
 
-    const achievement =
-      Number(goal.achievement);
+    const actual =
+      Number(achievement);
 
-    // MIN
-    if (
-      goal.uom ===
-        "Min Numeric" ||
-
-      goal.uom ===
-        "Min %"
-    ) {
-
-      if (!target)
-        return 0;
-
-      return Math.min(
-
-        (
-          achievement /
-          target
-        ) * 100,
-
-        100
-      ).toFixed(0);
-    }
-
-    // MAX
-    if (
-      goal.uom ===
-        "Max Numeric" ||
-
-      goal.uom ===
-        "Max %"
-    ) {
-
-      if (!achievement)
-        return 0;
-
-      return Math.min(
-
-        (
-          target /
-          achievement
-        ) * 100,
-
-        100
-      ).toFixed(0);
-    }
-
-    // ZERO
-    if (
-      goal.uom ===
-      "Zero"
-    ) {
-
-      return achievement === 0
-        ? 100
-        : 0;
-    }
-
-    // TIMELINE
-    if (
-      goal.uom ===
-      "Timeline"
-    ) {
-
-      if (
-        goal.progressStatus ===
-        "Completed"
-      ) {
-
-        return 100;
-      }
-
-      else if (
-        goal.progressStatus ===
-        "On Track"
-      ) {
-
-        return 60;
-      }
+    if(
+      !planned ||
+      !actual
+    ){
 
       return 0;
     }
 
-    return 0;
+    return Math.min(
+
+      Math.round(
+
+        (
+          actual /
+          planned
+        ) * 100
+      ),
+
+      150
+    );
   };
 
   // LOGOUT
@@ -504,7 +472,7 @@ function Dashboard() {
 
             <p className="logo-subtitle">
 
-              Employee Portal
+              Enterprise Performance Portal
 
             </p>
 
@@ -543,133 +511,145 @@ function Dashboard() {
 
             <h1 className="banner-title">
 
-              Employee Goal Dashboard
+              Employee Dashboard
 
             </h1>
 
             <p className="banner-subtitle">
 
-              Track goals and quarterly achievements
+              Goal management,
+              KPI tracking and
+              quarterly check-ins
 
             </p>
-
-            {/* PHASE */}
-            <div className="phase-badge">
-
-              Current Cycle:
-              {" "}
-
-              {currentPhase.phase}
-
-            </div>
-
-          </div>
-
-          <div className="profile-card">
-
-            <div className="profile-circle">
-
-              E
-
-            </div>
-
-            <div>
-
-              <p className="profile-role">
-
-                Logged in as
-
-              </p>
-
-              <h3 className="profile-name">
-
-                Employee
-
-              </h3>
-
-            </div>
 
           </div>
 
         </div>
 
-        {/* STATS */}
-        <div className="stats-grid">
+        {/* NOTIFICATIONS */}
+        <div className="notification-section">
 
-          <div className="stats-card">
+          <h2>
 
-            <p className="stats-label">
+            Notifications
 
-              Total Goals
+          </h2>
 
-            </p>
+          {
+            notifications.length === 0
 
-            <h1 className="stats-value">
+            ?
 
-              {goals.length}
+            <div className="empty-notification">
 
-            </h1>
+              No notifications yet
 
-          </div>
+            </div>
 
-          <div className="stats-card">
+            :
 
-            <p className="stats-label">
+            notifications.map((notification)=>(
 
-              Approved Goals
+              <div
+                key={notification.id}
+                className="notification-card"
+              >
 
-            </p>
+                <div className="notification-top">
 
-            <h1 className="stats-value green">
+                  <h4>
 
-              {
-                goals.filter(
+                    {notification.type}
 
-                  (goal) =>
+                  </h4>
 
-                    goal.status ===
-                    "Approved"
+                  {
+                    !notification.read
 
-                ).length
-              }
+                    &&
 
-            </h1>
+                    <span className="unread-dot">
 
-          </div>
+                    </span>
+                  }
 
-          <div className="stats-card">
+                </div>
 
-            <p className="stats-label">
+                <p>
 
-              Pending Approval
+                  {notification.message}
 
-            </p>
+                </p>
 
-            <h1 className="stats-value yellow">
+              </div>
+            ))
+          }
 
-              {
-                goals.filter(
+        </div>
 
-                  (goal) =>
+        {/* CHECK-IN */}
+        <div className="cycle-banner">
 
-                    goal.status ===
-                    "Pending Approval"
+          <h2>
 
-                ).length
-              }
+            Active Check-in Cycle:
+            {" "}
+            <span>
 
-            </h1>
+              {selectedCycle}
 
-          </div>
+            </span>
+
+          </h2>
+
+          <select
+            value={selectedCycle}
+
+            onChange={(e)=>
+
+              setSelectedCycle(
+                e.target.value
+              )
+            }
+
+            className="cycle-select"
+          >
+
+            <option value="Q1">
+
+              Q1 Check-in
+
+            </option>
+
+            <option value="Q2">
+
+              Q2 Check-in
+
+            </option>
+
+            <option value="Q3">
+
+              Q3 Check-in
+
+            </option>
+
+            <option value="Q4">
+
+              Q4 / Annual
+
+            </option>
+
+          </select>
 
         </div>
 
         {/* CREATE GOAL */}
         <div className="goal-form-card">
 
-          <h2 className="form-title">
+          <h2 className="section-title">
 
-            Create New Goal
+            Create Goal
 
           </h2>
 
@@ -678,124 +658,96 @@ function Dashboard() {
             <input
               type="text"
               placeholder="Goal Title"
-
               value={title}
-
-              onChange={(e) =>
+              onChange={(e)=>
                 setTitle(
                   e.target.value
                 )
               }
-
-              className="input-field"
-            />
-
-            <input
-              type="text"
-              placeholder="Thrust Area"
-
-              value={thrustArea}
-
-              onChange={(e) =>
-                setThrustArea(
-                  e.target.value
-                )
-              }
-
-              className="input-field"
-            />
-
-            <input
-              type="text"
-              placeholder="Target"
-
-              value={target}
-
-              onChange={(e) =>
-                setTarget(
-                  e.target.value
-                )
-              }
-
-              className="input-field"
-            />
-
-            <input
-              type="number"
-              placeholder="Weightage"
-
-              value={weightage}
-
-              onChange={(e) =>
-                setWeightage(
-                  e.target.value
-                )
-              }
-
               className="input-field"
             />
 
             <select
-              value={uom}
-
-              onChange={(e) =>
-                setUom(
+              value={thrustArea}
+              onChange={(e)=>
+                setThrustArea(
                   e.target.value
                 )
               }
-
               className="input-field"
             >
 
-              <option value="Min Numeric">
+              <option value="">
 
-                Min Numeric
-
-              </option>
-
-              <option value="Min %">
-
-                Min %
+                Select Thrust Area
 
               </option>
 
-              <option value="Max Numeric">
+              <option value="Business Growth">
 
-                Max Numeric
-
-              </option>
-
-              <option value="Max %">
-
-                Max %
+                Business Growth
 
               </option>
 
-              <option value="Timeline">
+              <option value="Operational Excellence">
 
-                Timeline
+                Operational Excellence
 
               </option>
 
-              <option value="Zero">
+              <option value="Customer Success">
 
-                Zero
+                Customer Success
+
+              </option>
+
+              <option value="Innovation">
+
+                Innovation
+
+              </option>
+
+              <option value="Engineering Excellence">
+
+                Engineering Excellence
 
               </option>
 
             </select>
 
             <input
-              type="date"
-
-              value={deadline}
-
-              onChange={(e) =>
-                setDeadline(
+              type="number"
+              placeholder="Target"
+              value={target}
+              onChange={(e)=>
+                setTarget(
                   e.target.value
                 )
               }
+              className="input-field"
+            />
 
+            <input
+              type="text"
+              placeholder="UoM"
+              value={uom}
+              onChange={(e)=>
+                setUom(
+                  e.target.value
+                )
+              }
+              className="input-field"
+            />
+
+            <input
+              type="number"
+              placeholder="Weightage %"
+              value={weightage}
+              onChange={(e)=>
+                setWeightage(
+                  e.target.value
+                )
+              }
               className="input-field"
             />
 
@@ -803,35 +755,80 @@ function Dashboard() {
 
           <textarea
             placeholder="Goal Description"
-
             value={description}
-
-            onChange={(e) =>
+            onChange={(e)=>
               setDescription(
                 e.target.value
               )
             }
-
             className="textarea-field"
           ></textarea>
 
-          <button
-            className="save-btn"
+          <div className="shared-toggle">
 
-            disabled={
-              !currentPhase.allowGoalCreation
-            }
+            <input
+              type="checkbox"
+              checked={shared}
+              onChange={(e)=>
+                setShared(
+                  e.target.checked
+                )
+              }
+            />
 
-            onClick={addGoal}
-          >
+            <label>
+
+              Shared KPI
+
+            </label>
+
+          </div>
+
+          {/* WEIGHTAGE */}
+          <div className="weightage-info">
+
+            Total KPI Weightage:
+            {" "}
+
+            <span>
+
+              {liveWeightage}%
+
+            </span>
+
+          </div>
+
+          {/* STATUS */}
+          <div className="weightage-status">
 
             {
-              currentPhase.allowGoalCreation
+              liveWeightage === 100
 
-                ? "Add Goal"
+              ?
 
-                : "Goal Creation Closed"
+              <span className="weightage-success">
+
+                Goal sheet completed successfully (100%)
+
+              </span>
+
+              :
+
+              <span className="weightage-warning">
+
+                Final total must reach exactly 100%
+
+              </span>
             }
+
+          </div>
+
+          <button
+            className="create-btn"
+            onClick={createGoal}
+          >
+
+            Create Goal
 
           </button>
 
@@ -840,14 +837,13 @@ function Dashboard() {
         {/* GOALS */}
         <div className="goal-grid">
 
-          {goals.map((goal) => (
+          {goals.map((goal)=>(
 
             <div
               key={goal.id}
               className="goal-card"
             >
 
-              {/* TOP */}
               <div className="goal-top">
 
                 <div>
@@ -858,23 +854,25 @@ function Dashboard() {
 
                   </h2>
 
-                  <p className="goal-email">
+                  <p className="goal-status">
 
-                    {goal.thrustArea}
+                    {goal.status}
 
                   </p>
 
                 </div>
 
-                {goal.shared && (
+                {
+                  goal.shared
 
-                  <div className="shared-badge">
+                  &&
+
+                  <div className="performance-badge">
 
                     Shared KPI
 
                   </div>
-
-                )}
+                }
 
               </div>
 
@@ -882,76 +880,130 @@ function Dashboard() {
               <div className="goal-details">
 
                 <p>
-                  🎯 Target:
+
+                  🚀 Thrust Area:
                   {" "}
-                  {goal.target}
+                  {goal.thrustArea}
+
                 </p>
 
                 <p>
+
+                  🎯 Planned Target:
+                  {" "}
+                  {goal.target}
+                  {" "}
+                  {goal.uom}
+
+                </p>
+
+                <p>
+
                   ⚖ Weightage:
                   {" "}
                   {goal.weightage}%
+
                 </p>
 
                 <p>
-                  📏 UoM:
-                  {" "}
-                  {goal.uom}
-                </p>
 
-                <p>
-                  📌 Status:
-                  {" "}
-                  {goal.status}
-                </p>
-
-                <p>
-                  📈 Progress:
+                  📈 Progress Status:
                   {" "}
                   {goal.progressStatus}
+
+                </p>
+
+              </div>
+
+              {/* KPI */}
+              <div className="progress-engine">
+
+                <h3>
+
+                  KPI Performance
+
+                </h3>
+
+                <p>
+
+                  📊 Achievement:
+                  {" "}
+
+                  {
+                    goal.achievements?.[
+                      selectedCycle.toLowerCase()
+                    ]
+                    || 0
+                  }
+
+                  {" "}
+                  {goal.uom}
+
                 </p>
 
                 <p>
-                  📊 Progress Score:
+
+                  Current Progress:
                   {" "}
-                  {calculateProgress(goal)}%
+
+                  {
+
+                    calculateProgress(
+
+                      goal.target,
+
+                      goal.achievements?.[
+                        selectedCycle.toLowerCase()
+                      ]
+                    )
+                  }
+
+                  %
+
                 </p>
 
                 <div className="progress-bar">
 
                   <div
                     className="progress-fill"
-
                     style={{
+
                       width:
-                        `${calculateProgress(goal)}%`
+                        `${
+
+                          calculateProgress(
+
+                            goal.target,
+
+                            goal.achievements?.[
+                              selectedCycle.toLowerCase()
+                            ]
+                          )
+                        }%`
                     }}
-                  ></div>
+                  >
+
+                  </div>
 
                 </div>
 
               </div>
 
-              {/* CHECK-IN */}
-              <div className="section-box">
+              {/* ACHIEVEMENT */}
+              <div className="achievement-box">
 
                 <h3 className="section-title">
 
-                  Quarterly Achievement Update
+                  {selectedCycle}
+                  {" "}
+                  Achievement Update
 
                 </h3>
 
                 <input
-                  type="text"
-                  placeholder="Achievement"
-
-                  disabled={
-                    goal.locked ||
-
-                    !currentPhase.allowCheckin
-                  }
-
-                  onChange={(e) =>
+                  type="number"
+                  placeholder={`Enter achievement (${goal.uom})`}
+                  onChange={(e)=>
 
                     setAchievementInputs({
 
@@ -959,108 +1011,131 @@ function Dashboard() {
 
                       [goal.id]:
                         e.target.value,
-
                     })
-
                   }
-
                   className="input-field"
                 />
 
-                <select
-                  disabled={
-                    goal.locked ||
-
-                    !currentPhase.allowCheckin
-                  }
-
-                  onChange={(e) =>
-
-                    setStatusInputs({
-
-                      ...statusInputs,
-
-                      [goal.id]:
-                        e.target.value,
-
-                    })
-
-                  }
-
-                  className="input-field"
-                >
-
-                  <option>
-
-                    Not Started
-
-                  </option>
-
-                  <option>
-
-                    On Track
-
-                  </option>
-
-                  <option>
-
-                    Completed
-
-                  </option>
-
-                </select>
-
                 <button
-                  disabled={
-                    goal.locked ||
-
-                    !currentPhase.allowCheckin
-                  }
-
-                  className="save-btn"
-
-                  onClick={() =>
-                    updateAchievement(
-                      goal
-                    )
+                  className="update-btn"
+                  onClick={()=>
+                    updateAchievement(goal)
                   }
                 >
 
-                  {
-                    currentPhase.allowCheckin
-
-                      ? "Update Achievement"
-
-                      : "Check-in Window Closed"
-                  }
+                  Update Achievement
 
                 </button>
 
-              </div>
+                {
+                  goal.shared
 
-              {/* FEEDBACK */}
-              {goal.managerFeedback && (
+                  &&
 
-                <div className="feedback-box">
+                  <div className="shared-readonly-box">
 
-                  <h3>
+                    Shared KPI goals allow only weightage modification.
 
-                    Manager Feedback
+                  </div>
+                }
 
-                  </h3>
+                {/* HISTORY */}
+                <div className="history-box">
+
+                  <h4>
+
+                    Check-in History
+
+                  </h4>
 
                   <p>
 
-                    {goal.managerFeedback}
+                    Q1:
+                    {" "}
+
+                    {
+                      goal.achievements?.q1
+                      || "No update"
+                    }
+
+                    {" "}
+                    {goal.uom}
+
+                  </p>
+
+                  <p>
+
+                    Q2:
+                    {" "}
+
+                    {
+                      goal.achievements?.q2
+                      || "No update"
+                    }
+
+                    {" "}
+                    {goal.uom}
+
+                  </p>
+
+                  <p>
+
+                    Q3:
+                    {" "}
+
+                    {
+                      goal.achievements?.q3
+                      || "No update"
+                    }
+
+                    {" "}
+                    {goal.uom}
+
+                  </p>
+
+                  <p>
+
+                    Q4:
+                    {" "}
+
+                    {
+                      goal.achievements?.q4
+                      || "No update"
+                    }
+
+                    {" "}
+                    {goal.uom}
 
                   </p>
 
                 </div>
 
-              )}
+                {/* FEEDBACK */}
+                {
+                  goal.managerFeedback
+
+                  &&
+
+                  <div className="feedback-box">
+
+                    <h3>
+
+                      Manager Feedback
+
+                    </h3>
+
+                    <p>
+
+                      {goal.managerFeedback}
+
+                    </p>
+
+                  </div>
+                }
+
+              </div>
 
             </div>
-
           ))}
 
         </div>

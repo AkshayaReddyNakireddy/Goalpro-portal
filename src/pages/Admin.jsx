@@ -5,6 +5,10 @@ import {
   getDocs,
   updateDoc,
   doc,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy,
 } from "firebase/firestore";
 
 import {
@@ -18,9 +22,10 @@ import {
 
 import {
   useNavigate,
+  Link,
 } from "react-router-dom";
 
-import "../styles/admin.css";
+import "../styles/Admin.css";
 
 function Admin() {
 
@@ -35,12 +40,42 @@ function Admin() {
   setAuditLogs] =
     useState([]);
 
+  // ANALYTICS
+  const [completionRate,
+  setCompletionRate] =
+    useState(0);
+
+  const [pendingApprovals,
+  setPendingApprovals] =
+    useState(0);
+
+  const [lockedGoals,
+  setLockedGoals] =
+    useState(0);
+
+  const [q1Average,
+  setQ1Average] =
+    useState(0);
+
+  const [q2Average,
+  setQ2Average] =
+    useState(0);
+
+  const [q3Average,
+  setQ3Average] =
+    useState(0);
+
+  const [q4Average,
+  setQ4Average] =
+    useState(0);
+
   // FETCH GOALS
   const fetchGoals =
   async () => {
 
     const querySnapshot =
       await getDocs(
+
         collection(
           db,
           "goals"
@@ -58,38 +93,128 @@ function Admin() {
             docItem.id,
 
           ...docItem.data(),
-
         });
       }
     );
 
     setGoals(data);
+
+    // COMPLETION RATE
+    const completed =
+
+      data.filter(
+        goal =>
+
+          goal.progressStatus ===
+          "Completed"
+      ).length;
+
+    setCompletionRate(
+
+      data.length
+
+      ?
+
+      Math.round(
+
+        (
+          completed /
+          data.length
+        ) * 100
+      )
+
+      :
+
+      0
+    );
+
+    // PENDING
+    setPendingApprovals(
+
+      data.filter(
+        goal =>
+
+          goal.status ===
+          "Pending Approval"
+      ).length
+    );
+
+    // LOCKED
+    setLockedGoals(
+
+      data.filter(
+        goal =>
+
+          goal.locked === true
+      ).length
+    );
+
+    // QUARTER AVERAGES
+    setQ1Average(
+      calculateQuarterAverage(
+        data,
+        "q1"
+      )
+    );
+
+    setQ2Average(
+      calculateQuarterAverage(
+        data,
+        "q2"
+      )
+    );
+
+    setQ3Average(
+      calculateQuarterAverage(
+        data,
+        "q3"
+      )
+    );
+
+    setQ4Average(
+      calculateQuarterAverage(
+        data,
+        "q4"
+      )
+    );
   };
 
   // FETCH AUDIT LOGS
   const fetchAuditLogs =
   async () => {
 
-    const querySnapshot =
-      await getDocs(
-        collection(
-          db,
-          "auditLogs"
-        )
-      );
+    const q = query(
 
-    const logs = [];
+      collection(
+        db,
+        "auditLogs"
+      ),
+
+      orderBy(
+        "timestamp",
+        "desc"
+      )
+    );
+
+    const querySnapshot =
+      await getDocs(q);
+
+    const data = [];
 
     querySnapshot.forEach(
       (docItem) => {
 
-        logs.push(
-          docItem.data()
-        );
+        data.push({
+
+          id:
+            docItem.id,
+
+          ...docItem.data(),
+        });
       }
     );
 
-    setAuditLogs(logs);
+    setAuditLogs(data);
   };
 
   useEffect(() => {
@@ -100,34 +225,154 @@ function Admin() {
 
   }, []);
 
+  // KPI AVERAGE
+  const calculateQuarterAverage = (
+    goals,
+    quarter
+  ) => {
+
+    let total = 0;
+
+    let count = 0;
+
+    goals.forEach(goal => {
+
+      const target =
+        Number(goal.target);
+
+      const achievement =
+        Number(
+
+          goal.achievements?.[
+            quarter
+          ]
+        );
+
+      if(
+        target &&
+        achievement
+      ){
+
+        total +=
+
+          Math.min(
+
+            (
+              achievement /
+              target
+            ) * 100,
+
+            150
+          );
+
+        count++;
+      }
+    });
+
+    return count
+
+      ?
+
+      Math.round(
+        total / count
+      )
+
+      :
+
+      0;
+  };
+
   // UNLOCK GOAL
   const unlockGoal =
-  async (goal) => {
+  async (goalId) => {
 
     await updateDoc(
 
       doc(
         db,
         "goals",
-        goal.id
+        goalId
       ),
 
       {
 
         locked:false,
+
+        status:"Reopened"
+      }
+    );
+
+    const unlockedGoal =
+
+      goals.find(
+        goal =>
+          goal.id === goalId
+      );
+
+    // NOTIFICATION
+    await addDoc(
+
+      collection(
+        db,
+        "notifications"
+      ),
+
+      {
+
+        email:
+          unlockedGoal.employeeEmail,
+
+        type:
+          "unlock",
+
+        message:
+          `Your goal "${unlockedGoal.title}" was reopened by Admin.`,
+
+        createdAt:
+          serverTimestamp(),
+
+        read:false,
+      }
+    );
+
+    // AUDIT
+    await addDoc(
+
+      collection(
+        db,
+        "auditLogs"
+      ),
+
+      {
+
+        action:
+          "Goal Reopened",
+
+        goalTitle:
+          unlockedGoal.title,
+
+        performedBy:
+          auth.currentUser.email,
+
+        role:
+          "Admin",
+
+        timestamp:
+          new Date().toISOString(),
       }
     );
 
     alert(
-      "Goal Unlocked"
+      "Goal unlocked successfully"
     );
 
     fetchGoals();
+
+    fetchAuditLogs();
   };
 
   // EXPORT CSV
-  const exportCSV =
-  () => {
+  const exportCSV = () => {
 
     const headers = [
 
@@ -137,17 +382,19 @@ function Admin() {
 
       "Target",
 
-      "Achievement",
+      "Q1",
 
-      "Approval Status",
+      "Q2",
 
-      "Progress Status",
+      "Q3",
 
-      "Weightage",
+      "Q4",
+
+      "Status"
     ];
 
     const rows =
-      goals.map((goal) => [
+      goals.map(goal => [
 
         goal.employeeEmail,
 
@@ -155,61 +402,49 @@ function Admin() {
 
         goal.target,
 
-        goal.achievement || "",
+        goal.achievements?.q1 || "",
 
-        goal.status,
+        goal.achievements?.q2 || "",
 
-        goal.progressStatus,
+        goal.achievements?.q3 || "",
 
-        goal.weightage,
+        goal.achievements?.q4 || "",
+
+        goal.progressStatus
       ]);
 
-    let csv =
-      headers.join(",") +
-      "\n";
+    let csvContent =
 
-    rows.forEach((row) => {
+      "data:text/csv;charset=utf-8," +
 
-      csv +=
-        row.join(",") +
-        "\n";
-    });
+      [
+        headers.join(","),
 
-    const blob =
-      new Blob(
+        ...rows.map(
+          row =>
+            row.join(",")
+        )
+      ].join("\n");
 
-        [csv],
-
-        {
-          type:
-            "text/csv;charset=utf-8;",
-        }
-      );
+    const encodedUri =
+      encodeURI(csvContent);
 
     const link =
-      document.createElement(
-        "a"
-      );
+      document.createElement("a");
 
-    const url =
-      URL.createObjectURL(
-        blob
-      );
-
-    link.href = url;
-
-    link.download =
-      "achievement_report.csv";
-
-    document.body.appendChild(
-      link
+    link.setAttribute(
+      "href",
+      encodedUri
     );
+
+    link.setAttribute(
+      "download",
+      "achievement_report.csv"
+    );
+
+    document.body.appendChild(link);
 
     link.click();
-
-    document.body.removeChild(
-      link
-    );
   };
 
   // LOGOUT
@@ -226,56 +461,24 @@ function Admin() {
     <div className="admin-container">
 
       {/* SIDEBAR */}
-      <div className="sidebar">
+      <div className="admin-sidebar">
 
         <div>
 
-          {/* LOGO */}
-          <div className="logo-section">
+          <h1 className="admin-logo">
 
-            <h1 className="logo-title">
+            GoalPro
 
-              GoalPro
+          </h1>
 
-            </h1>
+          <p className="admin-subtitle">
 
-            <p className="logo-subtitle">
+            Enterprise Admin Portal
 
-              Admin / HR Portal
-
-            </p>
-
-          </div>
-
-          {/* MENU */}
-          <div className="menu">
-
-            <div className="menu-item active">
-
-              Dashboard
-
-            </div>
-
-            {/* FIXED SHARED KPI NAVIGATION */}
-            <div
-              className="menu-item"
-
-              onClick={() =>
-  navigate(
-    "/shared-kpi?from=admin"
-  )
-}
-            >
-
-              Shared KPI
-
-            </div>
-
-          </div>
+          </p>
 
         </div>
 
-        {/* LOGOUT */}
         <button
           className="logout-btn"
 
@@ -289,270 +492,342 @@ function Admin() {
       </div>
 
       {/* MAIN */}
-      <div className="main-content">
+      <div className="admin-main">
 
         {/* HEADER */}
-        <div className="top-banner">
+        <div className="admin-header">
 
           <div>
 
-            <h1 className="banner-title">
+            <h1>
 
               Admin Dashboard
 
             </h1>
 
-            <p className="banner-subtitle">
+            <p>
 
-              Governance, reporting and completion monitoring
+              Governance,
+              Analytics &
+              Performance Oversight
 
             </p>
 
           </div>
 
-          <div className="profile-card">
+          <div className="header-actions">
 
-            <div className="profile-circle">
+            <button
+              className="export-btn"
 
-              A
+              onClick={exportCSV}
+            >
 
-            </div>
+              Export Achievement Report
 
-            <div>
+            </button>
 
-              <p className="profile-role">
+            <Link to="/sharedkpi">
 
-                Logged in as
+              <button
+                className="shared-kpi-btn"
 
-              </p>
+                onClick={()=>
 
-              <h3 className="profile-name">
+                  localStorage.setItem(
+                    "sharedKpiFrom",
+                    "admin"
+                  )
+                }
+              >
 
-                Admin / HR
+                Shared KPI Portal
 
-              </h3>
+              </button>
 
-            </div>
+            </Link>
 
           </div>
 
         </div>
 
-        {/* STATS */}
-        <div className="stats-grid">
+        {/* OVERVIEW */}
+        <div className="overview-grid">
 
-          <div className="stats-card">
+          <div className="overview-card">
 
-            <p className="stats-label">
+            <h3>
 
               Total Goals
 
-            </p>
+            </h3>
 
-            <h1 className="stats-value">
+            <p>
 
               {goals.length}
 
-            </h1>
+            </p>
 
           </div>
 
-          <div className="stats-card">
+          <div className="overview-card">
 
-            <p className="stats-label">
+            <h3>
 
-              Locked Goals
+              Pending Approvals
+
+            </h3>
+
+            <p>
+
+              {pendingApprovals}
 
             </p>
 
-            <h1 className="stats-value green">
-
-              {
-                goals.filter(
-
-                  (goal)=>
-
-                    goal.locked
-                ).length
-              }
-
-            </h1>
-
           </div>
 
-          <div className="stats-card">
+          <div className="overview-card">
 
-            <p className="stats-label">
-
-              Audit Logs
-
-            </p>
-
-            <h1 className="stats-value yellow">
-
-              {auditLogs.length}
-
-            </h1>
-
-          </div>
-
-          <div className="stats-card">
-
-            <p className="stats-label">
+            <h3>
 
               Completion Rate
 
+            </h3>
+
+            <p>
+
+              {completionRate}%
+
             </p>
 
-            <h1 className="stats-value green">
+          </div>
 
-              {
-                goals.length > 0
+          <div className="overview-card">
 
-                ?
+            <h3>
 
-                Math.round(
+              Locked Goals
 
-                  (
-                    goals.filter(
+            </h3>
 
-                      (goal)=>
+            <p>
 
-                        goal.progressStatus ===
-                        "Completed"
+              {lockedGoals}
 
-                    ).length /
-
-                    goals.length
-                  ) * 100
-
-                )
-
-                : 0
-              }%
-
-            </h1>
+            </p>
 
           </div>
 
         </div>
 
-        {/* EXPORT */}
-        <button
-          className="export-btn"
-
-          onClick={exportCSV}
-        >
-
-          Export Achievement Report
-
-        </button>
-
         {/* ANALYTICS */}
-        <div className="analytics-card">
+        <div className="analytics-section">
 
-          <h2 className="section-main-title">
+          <h2 className="analytics-title">
 
-            Analytics Overview
+            Enterprise Analytics Dashboard
 
           </h2>
 
           <div className="analytics-grid">
 
-            <div className="analytics-item">
+            <div className="analytics-card">
 
               <h3>
 
+                QoQ Achievement Trend
+
+              </h3>
+
+              <div className="trend-list">
+
+                <p>Q1: {q1Average}%</p>
+
+                <p>Q2: {q2Average}%</p>
+
+                <p>Q3: {q3Average}%</p>
+
+                <p>Q4: {q4Average}%</p>
+
+              </div>
+
+            </div>
+
+            <div className="analytics-card">
+
+              <h3>
+
+                Quarterly Completion Rate
+
+              </h3>
+
+              <div className="completion-circle">
+
+                {completionRate}%
+
+              </div>
+
+              <p>
+
+                Employees completed quarterly check-ins
+
+              </p>
+
+            </div>
+
+            <div className="analytics-card">
+
+              <h3>
+
+                Goal Distribution
+
+              </h3>
+
+              <p>
+
+                Shared KPIs:
+                {" "}
+
                 {
                   goals.filter(
+                    goal =>
+                      goal.shared
+                  ).length
+                }
 
-                    (goal)=>
+              </p>
+
+              <p>
+
+                Locked Goals:
+                {" "}
+                {lockedGoals}
+
+              </p>
+
+              <p>
+
+                Completed Goals:
+                {" "}
+
+                {
+                  goals.filter(
+                    goal =>
 
                       goal.progressStatus ===
                       "Completed"
-
                   ).length
                 }
-
-              </h3>
-
-              <p>
-
-                Completed Goals
 
               </p>
 
             </div>
 
-            <div className="analytics-item">
+            <div className="analytics-card">
 
               <h3>
 
-                {
-                  goals.filter(
-
-                    (goal)=>
-
-                      goal.status ===
-                      "Pending Approval"
-
-                  ).length
-                }
+                Manager Effectiveness
 
               </h3>
 
               <p>
+
+                Approved Goals
+
+              </p>
+
+              <div className="manager-score">
+
+                {
+                  goals.filter(
+                    goal =>
+
+                      goal.status ===
+                      "Approved"
+                  ).length
+                }
+
+                {" / "}
+
+                {goals.length}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* GOVERNANCE */}
+        <div className="governance-section">
+
+          <h2>
+
+            Governance & Compliance
+
+          </h2>
+
+          <div className="governance-grid">
+
+            <div className="governance-card">
+
+              <h3>
 
                 Pending Approvals
 
-              </p>
-
-            </div>
-
-            <div className="analytics-item">
-
-              <h3>
-
-                {
-                  goals.filter(
-
-                    (goal)=>
-
-                      goal.status ===
-                      "Rework Required"
-
-                  ).length
-                }
-
               </h3>
 
               <p>
 
-                Rework Goals
+                {pendingApprovals}
+                {" "}
+                goals awaiting manager approval
 
               </p>
 
             </div>
 
-            <div className="analytics-item">
+            <div className="governance-card">
 
               <h3>
 
-                {
-                  goals.filter(
-
-                    (goal)=>
-
-                      goal.shared === true
-
-                  ).length
-                }
+                Escalations Triggered
 
               </h3>
 
               <p>
 
-                Shared KPIs
+                {
+                  goals.filter(
+                    goal =>
+
+                      goal.progressStatus ===
+                      "Critical"
+                  ).length
+                }
+
+                {" "}
+                critical performance goals
+
+              </p>
+
+            </div>
+
+            <div className="governance-card">
+
+              <h3>
+
+                Audit Trail Entries
+
+              </h3>
+
+              <p>
+
+                {auditLogs.length}
+                {" "}
+                activity records available
 
               </p>
 
@@ -562,212 +837,154 @@ function Admin() {
 
         </div>
 
-        {/* GOALS */}
-        <div className="goal-section">
+        {/* AUDIT TIMELINE */}
+        <div className="audit-section">
 
-          <h2 className="section-main-title">
+          <h2>
 
-            Goal Governance
+            Enterprise Audit Timeline
 
           </h2>
 
-          <div className="goal-grid">
+          <div className="audit-list">
+
+            {
+              auditLogs.length === 0
+
+              ?
+
+              <div className="empty-audit">
+
+                No audit logs available
+
+              </div>
+
+              :
+
+              auditLogs.map((log)=>(
+
+                <div
+                  key={log.id}
+                  className="audit-card"
+                >
+
+                  <div className="audit-top">
+
+                    <h3>
+
+                      {log.action}
+
+                    </h3>
+
+                    <span>
+
+                      {log.role}
+
+                    </span>
+
+                  </div>
+
+                  <p>
+
+                    Goal:
+                    {" "}
+                    {log.goalTitle}
+
+                  </p>
+
+                  <p>
+
+                    Performed By:
+                    {" "}
+                    {log.performedBy}
+
+                  </p>
+
+                  <p>
+
+                    {
+                      new Date(
+                        log.timestamp
+                      ).toLocaleString()
+                    }
+
+                  </p>
+
+                </div>
+              ))
+            }
+
+          </div>
+
+        </div>
+
+        {/* GOAL TABLE */}
+        <div className="goal-table-section">
+
+          <h2>
+
+            Goal Governance Table
+
+          </h2>
+
+          <div className="goal-table">
 
             {goals.map((goal)=>(
 
               <div
                 key={goal.id}
-                className="goal-card"
+                className="goal-row"
               >
 
-                {/* TOP */}
-                <div className="goal-top">
+                <div>
 
-                  <div>
+                  <h3>
 
-                    <h2 className="goal-title">
+                    {goal.title}
 
-                      {goal.title}
+                  </h3>
 
-                    </h2>
+                  <p>
 
-                    <p className="goal-email">
+                    {goal.employeeEmail}
 
-                      {goal.employeeEmail}
+                  </p>
 
-                    </p>
+                </div>
 
-                  </div>
+                <div className="goal-actions">
+
+                  <span className="status-badge">
+
+                    {goal.status}
+
+                  </span>
 
                   {
                     goal.locked
 
-                    ?
-
-                    <div className="locked-badge">
-
-                      Locked
-
-                    </div>
-
-                    :
-
-                    <div className="unlocked-badge">
-
-                      Editable
-
-                    </div>
-                  }
-
-                </div>
-
-                {/* DETAILS */}
-                <div className="goal-details">
-
-                  <p>
-
-                    🎯 Target:
-                    {" "}
-                    {goal.target}
-
-                  </p>
-
-                  <p>
-
-                    📊 Achievement:
-                    {" "}
-                    {
-                      goal.achievement ||
-                      "N/A"
-                    }
-
-                  </p>
-
-                  <p>
-
-                    📈 Progress:
-                    {" "}
-                    {goal.progressStatus}
-
-                  </p>
-
-                  <p>
-
-                    📌 Status:
-                    {" "}
-                    {goal.status}
-
-                  </p>
-
-                </div>
-
-                {/* BUTTON */}
-                {
-                  goal.locked && (
+                    &&
 
                     <button
                       className="unlock-btn"
 
-                      onClick={() =>
-                        unlockGoal(goal)
+                      onClick={()=>
+
+                        unlockGoal(
+                          goal.id
+                        )
                       }
                     >
 
                       Unlock Goal
 
                     </button>
-                  )
-                }
+                  }
+
+                </div>
 
               </div>
             ))}
-
-          </div>
-
-        </div>
-
-        {/* AUDIT */}
-        <div className="audit-section">
-
-          <h2 className="section-main-title">
-
-            Audit Trail
-
-          </h2>
-
-          <div className="audit-grid">
-
-            {auditLogs.map(
-              (log,index)=>(
-
-                <div
-                  key={index}
-                  className="audit-card"
-                >
-
-                  <h3>
-
-                    {
-                      log.action ||
-                      "Activity"
-                    }
-
-                  </h3>
-
-                  <p>
-
-                    Goal:
-                    {" "}
-                    {
-                      log.goalTitle ||
-                      "No Goal"
-                    }
-
-                  </p>
-
-                  <p>
-
-                    By:
-                    {" "}
-                    {
-                      log.performedBy ||
-                      "Unknown User"
-                    }
-
-                  </p>
-
-                  <p>
-
-                    Role:
-                    {" "}
-                    {
-                      log.role ||
-                      "Unknown Role"
-                    }
-
-                  </p>
-
-                  <span>
-
-                    {
-                      log.timestamp
-
-                      ?
-
-                      new Date(
-                        log.timestamp
-                      ).toLocaleString()
-
-                      :
-
-                      "No Timestamp"
-                    }
-
-                  </span>
-
-                </div>
-              )
-            )}
 
           </div>
 

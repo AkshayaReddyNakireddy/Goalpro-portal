@@ -45,7 +45,7 @@ function App() {
 
         {/* SHARED KPI */}
         <Route
-          path="/shared-kpi"
+          path="/SharedKPI"
           element={<SharedKPI />}
         />
 
